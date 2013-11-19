@@ -34,9 +34,14 @@ public class ArgumentsTools {
         }
     }
 
+	/**
+	 * This method has been patched to allow entities at revision 0 to be queried.
+	 * A Hibernate bug has been raised but not yet fixed to address
+	 * this limitation (https://hibernate.onjira.com/browse/HHH-6235)
+	 */
     public static void checkPositive(Number i, String paramName) {
-        if (i.longValue() <= 0l) {
-            throw new IllegalArgumentException(paramName + " has to be greater than 0.");
+        if (i.longValue() < 0l) {
+            throw new IllegalArgumentException(paramName + " has to be greater than or equal to 0.");
         }
     }
 }

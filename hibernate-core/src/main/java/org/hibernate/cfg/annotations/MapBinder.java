@@ -279,6 +279,12 @@ public class MapBinder extends CollectionBinder {
 							mapKeyTypeAnnotation.value()
 									.type()
 					) ) {
+						// Begin PHC Patch
+						// If the type is not set here, the call to elementBinder.make() 
+						// below will throw a NullPointerException due to 'property' not
+						// being set
+						elementBinder.setType( property, elementClass, this.collection.getOwnerEntityName() );
+						// End PHC Patch
 						elementBinder.setExplicitType( mapKeyTypeAnnotation.value() );
 					}
 					else {
