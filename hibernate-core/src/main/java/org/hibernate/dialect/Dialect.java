@@ -1881,7 +1881,7 @@ public abstract class Dialect implements ConversionContext {
 		StringBuilder res = new StringBuilder( 30 );
 
 		res.append( " add constraint " )
-				.append( constraintName )
+				.append( quote( constraintName ) )
 				.append( " foreign key (" )
 				.append( StringHelper.join( ", ", foreignKey ) )
 				.append( ") references " )
@@ -2402,5 +2402,15 @@ public abstract class Dialect implements ConversionContext {
 	
 	public String getNotExpression( String expression ) {
 		return "not " + expression;
+	}
+	
+	/**
+	 * Does this dialect support tuples in subqueries?  Ex:
+	 * delete from Table1 where (col1, col2) in (select col1, col2 from Table2)
+	 * 
+	 * @return boolean
+	 */
+	public boolean supportsTuplesInSubqueries() {
+		return true;
 	}
 }

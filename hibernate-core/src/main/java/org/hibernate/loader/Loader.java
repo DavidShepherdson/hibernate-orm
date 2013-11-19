@@ -2164,7 +2164,7 @@ public abstract class Loader {
 		catch ( SQLException sqle ) {
 			throw factory.getSQLExceptionHelper().convert(
 			        sqle,
-			        "could not collection element by index",
+			        "could not load collection element by index",
 			        getSQLString()
 				);
 		}
@@ -2592,7 +2592,9 @@ public abstract class Loader {
 		if ( stats ) startTime = System.currentTimeMillis();
 
 		try {
-			final SqlStatementWrapper wrapper = executeQueryStatement( queryParameters, true, Collections.<AfterLoadAction>emptyList(), session );
+			// Don't use Collections#emptyList() here -- follow on locking potentially adds AfterLoadActions,
+			// so the list cannot be immutable.
+			final SqlStatementWrapper wrapper = executeQueryStatement( queryParameters, true, new ArrayList<AfterLoadAction>(), session );
 			final ResultSet rs = wrapper.getResultSet();
 			final PreparedStatement st = (PreparedStatement) wrapper.getStatement();
 

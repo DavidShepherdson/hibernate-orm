@@ -1075,9 +1075,17 @@ public class Configuration implements Serializable {
 								)
 						);
 				}
+			}
+		}
+
+		// Foreign keys must be created *after* unique keys for numerous DBs.  See HH-8390.
+		iter = getTableMappings();
+		while ( iter.hasNext() ) {
+			Table table = (Table) iter.next();
+			if ( table.isPhysicalTable() ) {
 
 				if ( dialect.hasAlterTable() ) {
-					subIter = table.getForeignKeyIterator();
+					Iterator subIter = table.getForeignKeyIterator();
 					while ( subIter.hasNext() ) {
 						ForeignKey fk = (ForeignKey) subIter.next();
 						if ( fk.isPhysicalConstraint() ) {
@@ -1208,26 +1216,10 @@ public class Configuration implements Serializable {
 						String constraintString = uniqueKey.sqlCreateString( dialect, mapping, tableCatalog, tableSchema );
 						if ( constraintString != null && !constraintString.isEmpty() )
 							if ( constraintMethod.equals( UniqueConstraintSchemaUpdateStrategy.DROP_RECREATE_QUIETLY ) ) {
-								String constraintDropString = uniqueKey.sqlDropString( dialect, tableCatalog, tableCatalog );
+								String constraintDropString = uniqueKey.sqlDropString( dialect, tableCatalog, tableSchema );
 								scripts.add( new SchemaUpdateScript( constraintDropString, true) );
 							}
 							scripts.add( new SchemaUpdateScript( constraintString, true) );
-					}
-				}
-
-				if ( dialect.hasAlterTable() ) {
-					Iterator subIter = table.getForeignKeyIterator();
-					while ( subIter.hasNext() ) {
-						ForeignKey fk = (ForeignKey) subIter.next();
-						if ( fk.isPhysicalConstraint() ) {
-							boolean create = tableInfo == null || ( tableInfo.getForeignKeyMetadata( fk ) == null && (
-							// Icky workaround for MySQL bug:
-									!( dialect instanceof MySQLDialect ) || tableInfo.getIndexMetadata( fk.getName() ) == null ) );
-							if ( create ) {
-								scripts.add( new SchemaUpdateScript( fk.sqlCreateString( dialect, mapping,
-										tableCatalog, tableSchema ), false ) );
-							}
-						}
 					}
 				}
 
@@ -1243,6 +1235,35 @@ public class Configuration implements Serializable {
 					}
 					scripts.add( new SchemaUpdateScript( index.sqlCreateString( dialect, mapping, tableCatalog,
 							tableSchema ), false ) );
+				}
+			}
+		}
+
+		// Foreign keys must be created *after* unique keys for numerous DBs.  See HH-8390.
+		iter = getTableMappings();
+		while ( iter.hasNext() ) {
+			Table table = (Table) iter.next();
+			String tableSchema = ( table.getSchema() == null ) ? defaultSchema : table.getSchema();
+			String tableCatalog = ( table.getCatalog() == null ) ? defaultCatalog : table.getCatalog();
+			if ( table.isPhysicalTable() ) {
+
+				TableMetadata tableInfo = databaseMetadata.getTableMetadata( table.getName(), tableSchema,
+						tableCatalog, table.isQuoted() );
+
+				if ( dialect.hasAlterTable() ) {
+					Iterator subIter = table.getForeignKeyIterator();
+					while ( subIter.hasNext() ) {
+						ForeignKey fk = (ForeignKey) subIter.next();
+						if ( fk.isPhysicalConstraint() ) {
+							boolean create = tableInfo == null || ( tableInfo.getForeignKeyMetadata( fk ) == null && (
+							// Icky workaround for MySQL bug:
+									!( dialect instanceof MySQLDialect ) || tableInfo.getIndexMetadata( fk.getName() ) == null ) );
+							if ( create ) {
+								scripts.add( new SchemaUpdateScript( fk.sqlCreateString( dialect, mapping,
+										tableCatalog, tableSchema ), false ) );
+							}
+						}
+					}
 				}
 			}
 		}
@@ -1564,7 +1585,11 @@ public class Configuration implements Serializable {
 				//column equals and hashcode is based on column name
 			}
 			catch ( MappingException e ) {
-				unboundNoLogical.add( new Column( column ) );
+				// If at least 1 columnName does exist, 'columns' will contain a mix of Columns and nulls.  In order
+				// to exhaustively report all of the unbound columns at once, w/o an NPE in
+				// Constraint#generateName's array sorting, simply create a fake Column.
+				columns[index] = new Column( column );
+				unboundNoLogical.add( columns[index] );
 			}
 		}
 		
@@ -2957,7 +2982,7 @@ public class Configuration implements Serializable {
 				final String existingLogicalName = ( String ) physicalToLogical.put( physicalName, logicalName );
 				if ( existingLogicalName != null && ! existingLogicalName.equals( logicalName ) ) {
 					throw new DuplicateMappingException(
-							" Table [" + tableName + "] contains phyical column name [" + physicalName
+							" Table [" + tableName + "] contains physical column name [" + physicalName
 									+ "] represented by different logical column names: [" + existingLogicalName
 									+ "], [" + logicalName + "]",
 							"column-binding",
